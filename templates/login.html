@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Login - Django Chat</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        :root {
+            --fb-blue: #1877f2;
+            --fb-blue-hover: #166fe5;
+            --fb-green: #42b72a;
+            --fb-green-hover: #36a420;
+            --fb-bg: #f0f2f5;
+            --fb-text: #1c1e21;
+            --fb-radius: 6px;
+            --fb-shadow: 0 2px 4px rgba(0, 0, 0, .1), 0 8px 16px rgba(0, 0, 0, .1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        body {
+            background-color: var(--fb-bg);
+            color: var(--fb-text);
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .login-container {
+            display: flex;
+            width: 100%;
+            max-width: 1000px;
+            margin: 0 20px;
+        }
+
+        /* Left side - branding */
+        .branding {
+            flex: 1;
+            padding-right: 32px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .app-logo {
+            font-size: 3.5rem;
+            font-weight: bold;
+            color: var(--fb-blue);
+            margin-bottom: 10px;
+        }
+
+        .tagline {
+            font-size: 1.5rem;
+            font-weight: normal;
+            line-height: 1.4;
+        }
+
+        /* Right side - login form */
+        .form-container {
+            flex: 1;
+            max-width: 396px;
+        }
+
+        .login-card {
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: var(--fb-shadow);
+            padding: 20px;
+            margin-bottom: 28px;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 1px solid #dddfe2;
+            border-radius: var(--fb-radius);
+            font-size: 1rem;
+            color: var(--fb-text);
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--fb-blue);
+            box-shadow: 0 0 0 2px rgba(24, 119, 242, 0.2);
+        }
+
+        .error-message {
+            color: #f02849;
+            background-color: #ffebe8;
+            border: 1px solid #f02849;
+            padding: 12px;
+            margin-bottom: 16px;
+            border-radius: var(--fb-radius);
+            font-size: 0.9rem;
+        }
+
+        .login-btn {
+            width: 100%;
+            background-color: var(--fb-blue);
+            color: white;
+            border: none;
+            border-radius: var(--fb-radius);
+            font-size: 1.25rem;
+            font-weight: bold;
+            padding: 12px;
+            margin-bottom: 16px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+
+        .login-btn:hover {
+            background-color: var(--fb-blue-hover);
+        }
+
+        .forgot-password {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .forgot-password a {
+            color: var(--fb-blue);
+            font-size: 0.9rem;
+            text-decoration: none;
+        }
+
+        .forgot-password a:hover {
+            text-decoration: underline;
+        }
+
+        .divider {
+            display: flex;
+            align-items: center;
+            margin: 20px 0;
+        }
+
+        .divider::before, .divider::after {
+            content: "";
+            flex: 1;
+            border-bottom: 1px solid #dadde1;
+        }
+
+        .divider span {
+            padding: 0 10px;
+            color: #606770;
+            font-size: 0.9rem;
+        }
+
+        .create-account-btn {
+            display: inline-block;
+            background-color: var(--fb-green);
+            color: white;
+            border: none;
+            border-radius: var(--fb-radius);
+            font-size: 1.1rem;
+            font-weight: bold;
+            padding: 12px 16px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: background-color 0.3s;
+        }
+
+        .create-account-btn:hover {
+            background-color: var(--fb-green-hover);
+        }
+
+        .create-account-wrapper {
+            text-align: center;
+        }
+
+        .footer-text {
+            text-align: center;
+            margin-top: 28px;
+            font-size: 0.9rem;
+            color: var(--fb-text);
+        }
+
+        .footer-text a {
+            font-weight: bold;
+            text-decoration: none;
+            color: var(--fb-text);
+        }
+
+        .footer-text a:hover {
+            text-decoration: underline;
+        }
+
+        /* Responsive styles */
+        @media (max-width: 900px) {
+            .login-container {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .branding {
+                text-align: center;
+                padding-right: 0;
+                margin-bottom: 40px;
+            }
+            
+            .form-container {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <!-- Left side - branding -->
+        <div class="branding">
+            <h1 class="app-logo">django chat</h1>
+            <h2 class="tagline">Connect with friends and chat in real-time with Django Chat.</h2>
+        </div>
+        
+        <!-- Right side - login form -->
+        <div class="form-container">
+            <div class="login-card">
+                <form method="POST">
+                    {% csrf_token %}
+                    
+                    {% if error_message %}
+                    <div class="error-message">
+                        <i class="fas fa-exclamation-circle"></i> {{ error_message }}
+                    </div>
+                    {% endif %}
+                    
+                    <div class="form-group">
+                        <input type="text" name="username" id="username" class="form-input" placeholder="Email or username" required autofocus>
+                    </div>
+                    
+                    <div class="form-group">
+                        <input type="password" name="password" id="password" class="form-input" placeholder="Password" required>
+                    </div>
+                    
+                    <button type="submit" class="login-btn">Log In</button>
+                    
+                    <div class="forgot-password">
+                        <a href="#">Forgotten password?</a>
+                    </div>
+                    
+                    <div class="divider">
+                        <span>or</span>
+                    </div>
+                    
+                    <div class="create-account-wrapper">
+                        <a href="{% url 'register' %}" class="create-account-btn">Create New Account</a>
+                    </div>
+                </form>
+            </div>
+            
+            <div class="footer-text">
+                <p><a href="#">Create a Page</a> for a celebrity, brand or business.</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>

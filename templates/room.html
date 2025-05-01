@@ -1,0 +1,2227 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{room}} - Django Chat</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="/static/css/base.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/emoji-picker-element@^1/index.css">
+    <script type="module" src="https://cdn.jsdelivr.net/npm/emoji-picker-element@^1/index.js"></script>
+    <style>
+        :root {
+            --primary-color: #4963E6;
+            --primary-light: rgba(73, 99, 230, 0.1);
+            --primary-hover: #3a51cc;
+            --secondary-color: #FF5E84;
+            --secondary-hover: #e64e72;
+            --success-color: #39D98A;
+            --error-color: #FF3B5C;
+            --light-bg: #f8f9fd;
+            --chat-bg: #f0f2f5;
+            --card-bg: #ffffff;
+            --text-primary: #1A1D29;
+            --text-secondary: #6E7191;
+            --border-color: #E0E0FC;
+            --message-sent: #e7f1ff;
+            --message-sent-border: #c6ddfd;
+            --message-received: #ffffff;
+            --message-received-border: #e6e6e6;
+            --font-sans: 'Inter', sans-serif;
+            --shadow-sm: 0 2px 8px rgba(0,0,0,0.05);
+            --shadow-md: 0 4px 16px rgba(0,0,0,0.1);
+            --radius-sm: 8px;
+            --radius-md: 12px;
+            --radius-lg: 16px;
+            --transition: all 0.3s ease;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            justify-content: center;
+            align-items: center;
+        }
+
+        body {
+            font-family: var(--font-sans);
+            background-color: var(--light-bg);
+            color: var(--text-primary);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        /* Main layout - adding sidebar support */
+.chat-container {
+    display: flex;
+    height: 100vh;
+    width: 100%;
+    max-width: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+.chat-container > div {
+    overflow-y: auto;
+}
+
+/* Set chat content to fixed width */
+.chat-content {
+    flex: 0 0 auto; /* Don't grow or shrink */
+    width: 750px; /* Fixed width for chat content */
+    min-width: 500px; /* Minimum width for smaller screens */
+}
+
+/* Expand Room Info sidebar to fill left side */
+.room-sidebar {
+    flex: 1; /* Take available space on the left */
+    min-width: 300px; /* Minimum size */
+    max-width: 500px; /* Maximum size on very large screens */
+    overflow-y: auto; /* Add scrolling if content is too tall */
+}
+
+/* Expand Gemini Assistant to fill right side */
+.gemini-assistant {
+    flex: 1; /* Take available space on the right */
+    min-width: 300px; /* Minimum size */
+    max-width: 500px; /* Maximum size on very large screens */
+}
+
+/* Responsive adjustments for different screen sizes */
+@media (min-width: 1600px) {
+    /* Allow sidebars to be even wider on very large displays */
+    .room-sidebar, .gemini-assistant {
+        max-width: 550px;
+    }
+}
+
+@media (max-width: 1400px) {
+    /* On medium screens, restrict growth a bit */
+    .chat-content {
+        width: 650px;
+    }
+    
+    .room-sidebar, .gemini-assistant {
+        max-width: 400px;
+    }
+}
+
+/* Keep existing mobile behavior */
+@media (max-width: 1200px) {
+    .gemini-assistant {
+        position: fixed;
+        right: 0;
+        top: 0;
+        width: 350px;
+        transform: translateX(100%);
+        transition: transform 0.3s ease;
+        z-index: 1000;
+        flex: 0 0 auto;
+    }
+    
+    .gemini-assistant.show {
+        transform: translateX(0);
+    }
+}
+
+@media (max-width: 900px) {
+    .room-sidebar {
+        position: fixed;
+        left: 0;
+        top: 0;
+        width: 320px;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+        z-index: 1000;
+        height: 100vh;
+        flex: 0 0 auto;
+    }
+    
+    .room-sidebar.show {
+        transform: translateX(0);
+    }
+}
+        /* Header styles */
+        .chat-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 16px 24px;
+            background-color: var(--primary-color);
+            color: white;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .room-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .room-icon {
+            width: 40px;
+            height: 40px;
+            background-color: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+        }
+
+        .room-details h2 {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 2px;
+        }
+
+        .room-status {
+            font-size: 0.85rem;
+            opacity: 0.9;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .chat-actions {
+            display: flex;
+            gap: 20px;
+        }
+
+        .action-link {
+            color: white;
+            opacity: 0.9;
+            text-decoration: none;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: var(--transition);
+            position: relative;
+        }
+
+        .action-link:hover {
+            opacity: 1;
+        }
+
+        .action-link::after {
+            content: '';
+            position: absolute;
+            bottom: -4px;
+            left: 0;
+            width: 0;
+            height: 2px;
+            background-color: white;
+            transition: var(--transition);
+        }
+
+        .action-link:hover::after {
+            width: 100%;
+        }
+
+        .download-btn {
+            background-color: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: var(--radius-sm);
+            font-size: 0.9rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: var(--transition);
+        }
+
+        .download-btn:hover {
+            background-color: rgba(255, 255, 255, 0.3);
+        }
+
+        /* Messages area */
+        .chat-messages {
+            flex: 1 1 auto;
+            min-height: 0; /* Critical for Firefox */
+            overflow-y: auto;
+            padding: 20px;
+            background-color: var(--chat-bg);
+            min-height: 300px; /* Add minimum height */
+            border: 1px solid var(--border-color); /* Optional: add border for visibility */
+        }
+
+        /* Message groups - one group per user */
+        .message-group {
+            display: flex;
+            flex-direction: column;
+            max-width: 85%;
+            gap: 8px;
+        }
+
+        /* Align self messages to the right */
+        .self-messages {
+            align-self: flex-end;
+        }
+
+        /* Align other users' messages to the left */
+        .other-messages {
+            align-self: flex-start;
+        }
+
+        /* Base message styling */
+        .message {
+            position: relative;
+            padding: 12px 16px;
+            border-radius: 18px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+            max-width: 100%; /* Instead of using percentage width */
+            width: fit-content;
+        }
+
+        /* Ensure sent messages are aligned to the right within their group */
+        .message-sent {
+            align-self: flex-end;
+            background-color: #e3f2fd;
+            border: 1px solid #bbdefb;
+            border-bottom-right-radius: 4px;
+            margin-left: auto; /* Push to right edge of group */
+        }
+
+        /* Ensure received messages are aligned to the left within their group */
+        .message-received {
+            align-self: flex-start;
+            background-color: #ffffff;
+            border: 1px solid #e0e0e0;
+            border-bottom-left-radius: 4px;
+            margin-right: auto; /* Push to left edge of group */
+        }
+
+        /* First message in a group - show user name */
+        .message:first-child .message-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 6px;
+        }
+
+        /* Subsequent messages in a group - hide redundant user name */
+        .message:not(:first-child) .message-header {
+            display: none;
+        }
+
+        /* Message content formatting */
+        .message-content {
+            word-break: break-word;
+            line-height: 1.4;
+            margin: 0;
+        }
+
+        /* Message time stamp alignment */
+        .message-time {
+            font-size: 0.7rem;
+            color: var(--text-secondary);
+            margin-top: 4px;
+            text-align: right;
+        }
+
+        /* Optional: User avatar for improved visual distinction */
+        .other-messages::before {
+            content: attr(data-username);
+            position: absolute;
+            left: -45px;
+            top: 0;
+            width: 32px;
+            height: 32px;
+            background-color: var(--secondary-color);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        /* Improve message spacing for better readability */
+        .message + .message {
+            margin-top: 2px;
+        }
+
+        /* Additional padding for the messages container to accommodate avatars */
+        @media (min-width: 768px) {
+            .chat-messages {
+                padding-left: 60px;
+                padding-right: 30px;
+            }
+        }
+
+        /* Message width adjustments for better readability */
+        @media (min-width: 768px) {
+            .message {
+                max-width: 80%;
+            }
+        }
+
+        @media (max-width: 767px) {
+            .message {
+                max-width: 90%;
+            }
+            
+            .other-messages::before {
+                display: none; /* Hide avatars on mobile */
+            }
+            
+            .chat-messages {
+                padding: 15px;
+            }
+        }
+
+        /* Chat Input Form Styling */
+.chat-input-container {
+    padding: 16px;
+    background-color: var(--card-bg);
+    border-top: 1px solid var(--border-color);
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+}
+
+.chat-form {
+    display: flex;
+    align-items: center;
+    background-color: var(--light-bg);
+    border-radius: 24px;
+    padding: 4px 6px 4px 16px;
+    border: 1px solid var(--border-color);
+    transition: var(--transition);
+}
+
+.chat-form:focus-within {
+    border-color: var(--primary-color);
+    box-shadow: 0 0 0 2px rgba(73, 99, 230, 0.1);
+}
+
+.message-input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: none;
+    padding: 10px 0;
+    font-family: var(--font-sans);
+    font-size: 0.95rem;
+    color: var(--text-primary);
+}
+
+.input-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.input-btn {
+    background: none;
+    border: none;
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.input-btn:hover {
+    background-color: var(--primary-light);
+    color: var(--primary-color);
+}
+
+.send-btn {
+    background-color: var(--primary-color);
+    color: white;
+}
+
+.send-btn:hover {
+    background-color: var(--primary-hover);
+}
+
+/* Emoji Picker Styling */
+.emoji-picker-container {
+    position: relative;
+}
+
+emoji-picker {
+    position: absolute;
+    bottom: 50px;
+    right: 0;
+    width: 320px;
+    height: 400px;
+    background: white;
+    box-shadow: var(--shadow-md);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border-color);
+    visibility: hidden;
+    opacity: 0;
+    transform: translateY(10px);
+    transition: var(--transition);
+    z-index: 1000;
+}
+
+emoji-picker.visible {
+    visibility: visible;
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Download Dropdown Styling */
+.download-dropdown {
+    position: relative;
+}
+
+.download-options {
+    position: absolute;
+    top: 100%;
+    right: 0;
+    background-color: white;
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-md);
+    width: 180px;
+    z-index: 100;
+    margin-top: 8px;
+    border: 1px solid var(--border-color);
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(10px);
+    transition: var(--transition);
+}
+
+.download-dropdown:hover .download-options {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.download-options a {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    color: var(--text-primary);
+    text-decoration: none;
+    transition: var(--transition);
+}
+
+.download-options a:hover {
+    background-color: var(--primary-light);
+}
+
+.download-options a i {
+    color: var(--primary-color);
+}
+
+/* Message dropdown styling */
+.message-dropdown {
+    position: relative;
+    display: inline-block;
+}
+
+.dropdown-toggle {
+    width: 28px;
+    height: 28px;
+    background-color: rgba(240, 242, 245, 0.8);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0.7;
+}
+
+.message:hover .dropdown-toggle {
+    opacity: 1;
+}
+
+/* Improve dropdown menu styling */
+.dropdown-menu {
+    padding: 4px 0;
+    overflow: hidden;
+}
+
+.dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 12px;
+    border: none;
+    background: none;
+    text-align: left;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.dropdown-item:hover {
+    background-color: var(--primary-light);
+}
+
+/* Add specific colors for different actions */
+.copy-btn:hover i { color: #4CAF50; }
+.forward-btn:hover i { color: #2196F3; }
+.edit-btn:hover i { color: #FF9800; }
+.delete-btn:hover i { color: #F44336; }
+
+/* Animation for dropdown */
+@keyframes fadeInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Adjust message header to accommodate dropdown */
+.message-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+/* Message action buttons styling */
+.message-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 4px;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+    justify-content: flex-end;
+}
+
+.message:hover .message-actions {
+    opacity: 1;
+}
+
+.action-btn {
+    background: none;
+    border: none;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+    cursor: pointer;
+    transition: var (--transition);
+}
+
+.action-btn:hover {
+    background-color: var(--primary-light);
+}
+
+.copy-btn:hover { color: #4CAF50; }
+.forward-btn:hover { color: #2196F3; }
+.edit-btn:hover { color: #FF9800; }
+.delete-btn:hover { color: #F44336; }
+
+/* Attachment container styling */
+.attachment-container {
+    margin-top: 8px;
+    max-width: 100%;
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    background-color: rgba(0,0,0,0.02);
+}
+
+/* Image attachment constraints */
+.attachment-container img {
+    max-width: 100%;
+    max-height: 250px;
+    object-fit: contain;
+    display: block;
+}
+
+/* File attachment styling */
+.file-attachment {
+    display: flex;
+    align-items: center;
+    padding: 10px 12px;
+    gap: 12px;
+}
+
+.file-attachment i {
+    font-size: 1.8rem;
+    color: var (--primary-color);
+}
+
+.file-attachment span {
+    flex: 1;
+    font-size: 0.9rem;
+    word-break: break-word;
+    max-width: 180px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* Attachment actions styling */
+.attachment-actions {
+    display: flex;
+    justify-content: flex-end;
+    padding: 6px;
+    background-color: rgba(0,0,0,0.03);
+}
+
+/* For PDF attachments */
+.pdf-attachment {
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+.pdf-attachment i {
+    margin-bottom: 8px;
+}
+
+/* Gemini AI Assistant Styling */
+.gemini-assistant {
+    width: 320px;
+    background-color: var(--card-bg);
+    border-left: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+}
+
+.assistant-header {
+    padding: 16px;
+    background-color: #8e44ad; /* Purple for the AI */
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.assistant-header h3 {
+    font-size: 1.2rem;
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.toggle-assistant-btn {
+    background: none;
+    border: none;
+    color: white;
+    cursor: pointer;
+    width: 30px;
+    height: 30px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: var(--transition);
+}
+
+.toggle-assistant-btn:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.assistant-content {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    overflow: hidden;
+}
+
+.assistant-messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+}
+
+.assistant-message {
+    display: flex;
+    margin-bottom: 16px;
+    gap: 10px;
+}
+
+.assistant-icon {
+    width: 36px;
+    height: 36px;
+    background-color: #8e44ad;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    flex-shrink: 0;
+}
+
+.user-icon {
+    width: 36px;
+    height: 36px;
+    background-color: var(--primary-color);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    flex-shrink: 0;
+}
+
+.assistant-text {
+    background-color: #f5eeff;
+    border-radius: 12px;
+    padding: 12px;
+    position: relative;
+    flex: 1;
+}
+
+.assistant-text::before {
+    content: '';
+    position: absolute;
+    left: -8px;
+    top: 12px;
+    width: 0;
+    height: 0;
+    border-top: 8px solid transparent;
+    border-bottom: 8px solid transparent;
+    border-right: 8px solid #f5eeff;
+}
+
+.user-text {
+    background-color: var(--primary-light);
+    border-radius: 12px;
+    padding: 12px;
+    align-self: flex-end;
+}
+
+.assistant-text p, .user-text p {
+    margin: 0 0 8px 0;
+}
+
+.assistant-text p:last-child, .user-text p:last-child {
+    margin-bottom: 0;
+}
+
+.assistant-text ul {
+    margin: 8px 0;
+    padding-left: 20px;
+}
+
+.assistant-actions {
+    display: flex;
+    gap: 8px;
+    padding: 0 16px 16px;
+}
+
+.quick-action-btn {
+    background-color: #f0f2f5;
+    border: none;
+    border-radius: 12px;
+    padding: 8px 12px;
+    font-size: 0.9rem;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: var(--transition);
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.quick-action-btn:hover {
+    background-color: #e4e6eb;
+}
+
+.assistant-input-container {
+    padding: 16px;
+    border-top: 1px solid var(--border-color);
+}
+
+.assistant-form {
+    display: flex;
+    align-items: center;
+    background-color: var(--light-bg);
+    border-radius: 24px;
+    padding: 4px 4px 4px 16px;
+    border: 1px solid var (--border-color);
+}
+
+.assistant-input {
+    flex: 1;
+    border: none;
+    outline: none;
+    background: none;
+    padding: 8px 0;
+    font-family: var(--font-sans);
+    font-size: 0.95rem;
+}
+
+.assistant-send-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background-color: #8e44ad;
+    color: white;
+    border: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.assistant-send-btn:hover {
+    background-color: #7d3c98;
+}
+
+.assistant-typing {
+    display: flex;
+    gap: 4px;
+    margin-top: 4px;
+    padding-left: 8px;
+}
+
+.assistant-typing span {
+    width: 8px;
+    height: 8px;
+    background-color: #8e44ad;
+    border-radius: 50%;
+    display: inline-block;
+    animation: typing-bounce 1.4s infinite ease-in-out both;
+}
+
+.assistant-typing span:nth-child(1) {
+    animation-delay: -0.32s;
+}
+
+.assistant-typing span:nth-child(2) {
+    animation-delay: -0.16s;
+}
+
+@keyframes typing-bounce {
+    0%, 80%, 100% {
+        transform: scale(0);
+    }
+    40% {
+        transform: scale(1);
+    }
+}
+
+/* Mobile responsive styles */
+@media (max-width: 1200px) {
+    .gemini-assistant {
+        position: fixed;
+        right: 0;
+        top: 0;
+        transform: translateX(100%);
+        transition: transform 0.3s ease;
+        z-index: 1000;
+        width: 300px;
+    }
+    
+    .gemini-assistant.show {
+        transform: translateX(0);
+    }
+    
+    .chat-content {
+        width: 100%;
+    }
+    
+    /* Mobile chat toggle button */
+    .toggle-gemini-btn {
+        display: flex !important;
+    }
+}
+
+@media (min-width: 1201px) {
+    .toggle-gemini-btn {
+        display: none !important;
+    }
+}
+
+/* Add this to your existing <style> section */
+
+/* Fix chat messages scrolling */
+.chat-messages {
+    overflow-y: auto !important;
+    max-height: calc(100vh - 180px) !important; /* Adjust based on header/input heights */
+}
+
+/* Fix sidebar content scrolling */
+.sidebar-content {
+    overflow-y: auto;
+    height: calc(100vh - 60px); /* Adjust based on sidebar header height */
+    padding: 15px;
+}
+
+/* Fix assistant messages scrolling */
+.assistant-messages {
+    overflow-y: auto !important;
+    max-height: calc(100vh - 160px) !important; /* Adjust based on header/input heights */
+}
+
+/* Room list scrolling fix */
+.room-list {
+    overflow-y: auto !important;
+    max-height: 450px !important;
+}
+
+/* Ensure proper height distribution */
+.chat-content {
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
+    overflow: hidden;
+}
+
+/* Fix mobile sidebar scrolling */
+@media (max-width: 900px) {
+    .room-sidebar {
+        overflow-y: auto;
+    }
+    
+    .gemini-assistant {
+        overflow-y: auto;
+    }
+}
+
+/* Fix for Room Info button visibility */
+.toggle-sidebar-btn {
+    background-color: #FFCC00 !important; /* Bright yellow for visibility */
+    border-radius: 6px !important;
+    padding: 6px 12px !important;
+    color: #333 !important; /* Dark text for contrast */
+    font-weight: 500 !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+    border: none !important;
+    transition: all 0.3s ease !important;
+}
+
+.toggle-sidebar-btn:hover {
+    background-color: #FFD700 !important;
+    transform: translateY(-2px) !important;
+}
+
+/* Fix for Forward Message Modal overlay */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 2000;
+    justify-content: center;
+    align-items: center;
+}
+
+/* Enhanced Room Info Styles */
+.room-sidebar {
+    background-color: #f8f9fd;
+    border-right: 1px solid var(--border-color);
+}
+
+.sidebar-header {
+    background-color: var(--primary-color);
+    color: white;
+    padding: 15px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.sidebar-content {
+    padding: 20px !important;
+}
+
+.room-description, .room-stats, .room-members {
+    background-color: white;
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid #f0f2f5;
+}
+
+.stat-item:last-child {
+    border-bottom: none;
+}
+
+.stat-icon {
+    width: 40px;
+    height: 40px;
+    background-color: var(--primary-light);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary-color);
+    margin-right: 12px;
+}
+
+.member-item {
+    display: flex;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid #f0f2f5;
+}
+
+.member-avatar {
+    width: 40px;
+    height: 40px;
+    background-color: var(--primary-color);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+    margin-right: 12px;
+}
+
+.member-status {
+    display: flex;
+    align-items: center;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.member-status.online::before {
+    content: '';
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background-color: #39D98A;
+    border-radius: 50%;
+    margin-right: 6px;
+}
+
+/* Enhanced Forward Modal Styling */
+.modal-content {
+    background-color: white;
+    border-radius: 12px;
+    width: 90%;
+    max-width: 450px;
+    max-height: 90vh;
+    overflow: hidden;
+    box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+    animation: modal-slide-in 0.3s ease;
+}
+
+@keyframes modal-slide-in {
+    from {
+        opacity: 0;
+        transform: translateY(-30px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.modal-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.modal-header h3 {
+    margin: 0;
+    font-size: 1.2rem;
+    color: var(--text-primary);
+}
+
+.modal-body {
+    padding: 20px;
+}
+
+.room-list-content {
+    max-height: 300px;
+    overflow-y: auto;
+    margin-top: 15px;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+}
+
+.room-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 15px;
+    border-bottom: 1px solid var(--border-color);
+    transition: background-color 0.2s ease;
+}
+
+.room-item:hover {
+    background-color: var(--primary-light);
+}
+
+.room-item:last-child {
+    border-bottom: none;
+}
+
+.room-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: 500;
+}
+
+.forward-to-btn {
+    background-color: var(--primary-color);
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-weight: 500;
+}
+
+.forward-to-btn:hover {
+    background-color: var(--primary-hover);
+    transform: translateY(-2px);
+}
+
+/* Fix for Active Rooms scrolling issue */
+.room-list-container, .active-rooms {
+    max-height: 450px !important; 
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    padding-right: 5px !important;
+    margin-bottom: 15px !important;
+}
+
+/* Make sure the individual room items are properly spaced */
+.room-list-item {
+    padding: 10px 12px !important;
+    border-bottom: 1px solid var(--border-color) !important;
+    margin-bottom: 2px !important;
+}
+
+/* Remove any fixed height constraints that might be causing issues */
+.rooms-section {
+    height: auto !important;
+    max-height: none !important;
+}
+
+/* Ensure the room container allows scrolling */
+.rooms-container {
+    overflow-y: auto !important;
+    max-height: 75vh !important;
+}
+
+/* Fix mobile scrolling */
+@media (max-width: 768px) {
+    .room-list-container, .active-rooms {
+        max-height: 300px !important;
+    }
+}
+
+/* Add this to your <style> section */
+
+/* Moderately sized chat messages panel with proper attachment */
+.chat-messages {
+    flex: 1 1 auto !important;
+    width: 100% !important;
+    background-color: var(--chat-bg) !important;
+    border: 1px solid var(--border-color) !important;
+    border-radius: 8px !important;
+    margin: 0 !important;
+    padding: 20px !important;
+    min-height: 400px !important; /* Slightly increased from 300px */
+    max-height: calc(100vh - 180px) !important; /* Limit max height */
+    overflow-y: auto !important;
+    box-sizing: border-box !important;
+}
+
+/* Ensure chat content container has proper spacing */
+.chat-content {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 0 !important;
+    padding: 0 !important;
+}
+
+/* Remove any gaps between header and messages */
+.chat-header {
+    margin-bottom: 0 !important;
+}
+
+/* Remove gaps between messages and input */
+.chat-input-container {
+    margin-top: 0 !important;
+}
+    </style>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+    <div class="chat-container">
+        <!-- Room Sidebar -->
+        <div class="room-sidebar">
+            <div class="sidebar-header">
+                <h3><i class="fas fa-info-circle"></i> Room Info</h3>
+            </div>
+            
+            <div class="sidebar-content">
+                <div class="room-description">
+                    <h4><i class="fas fa-comment-alt"></i> About this room</h4>
+                    <p class="description-text">
+                        Welcome to <strong>{{room}}</strong> - a place for real-time communication and collaboration. This room was created for sharing ideas, files, and staying connected.
+                    </p>
+                </div>
+                
+                <div class="room-stats">
+                    <div class="stat-item">
+                        <div class="stat-icon">
+                            <i class="fas fa-calendar-alt"></i>
+                        </div>
+                        <div class="stat-details">
+                            <h5>Created</h5>
+                            <div class="stat-value">Today</div>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-item">
+                        <div class="stat-icon">
+                            <i class="fas fa-comments"></i>
+                        </div>
+                        <div class="stat-details">
+                            <h5>Messages</h5>
+                            <div class="stat-value" id="message-count">Loading...</div>
+                        </div>
+                    </div>
+                    
+                    <div class="stat-item">
+                        <div class="stat-icon">
+                            <i class="fas fa-file-alt"></i>
+                        </div>
+                        <div class="stat-details">
+                            <h5>Files Shared</h5>
+                            <div class="stat-value" id="file-count">Loading...</div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="room-members">
+                    <h4><i class="fas fa-users"></i> Recent Participants</h4>
+                    <div class="member-list" id="member-list">
+                        <div class="member-item">
+                            <div class="member-avatar">
+                                {{username.0|upper}}
+                            </div>
+                            <div class="member-details">
+                                <div class="member-name">{{username}} (You)</div>
+                                <div class="member-status online">Active now</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chat Content -->
+        <div class="chat-content">
+            <!-- Chat Header -->
+            <div class="chat-header">
+                <div class="room-info">
+                    <div class="room-icon">
+                        <i class="fas fa-comments"></i>
+                    </div>
+                    <div class="room-details">
+                        <h2>{{room}}</h2>
+                        <div class="room-status">
+                            <div class="status-dot"></div>
+                            <span>Active now</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="chat-actions">
+                    <!-- Show sidebar toggle button on mobile -->
+                    <button class="toggle-sidebar-btn action-link">
+                        <i class="fas fa-info-circle"></i>
+                        <span>Room Info</span>
+                    </button>
+                    
+                    <div class="download-dropdown">
+                        <button class="download-btn">
+                            <i class="fas fa-download"></i>
+                            <span>Download</span>
+                        </button>
+                        <div class="download-options">
+                            <a href="{% url 'download_chat_history' room %}?format=csv">
+                                <i class="fas fa-file-csv"></i> CSV Format
+                            </a>
+                            <a href="{% url 'download_chat_history' room %}?format=txt">
+                                <i class="fas fa-file-alt"></i> Text Format
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <a href="/" class="action-link">
+                        <i class="fas fa-home"></i>
+                        <span>Home</span>
+                    </a>
+                    
+                    {% if user.is_authenticated %}
+                    <a href="{% url 'logout' %}" class="action-link">
+                        <i class="fas fa-sign-out-alt"></i>
+                        <span>Logout</span>
+                    </a>
+                    {% endif %}
+                </div>
+            </div>
+            
+            <!-- Messages Area -->
+            <div id="display" class="chat-messages"></div>
+            
+            <!-- Chat Input -->
+            <div class="chat-input-container">
+                <form id="post-form" enctype="multipart/form-data" class="chat-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="username" id="username" value="{{username}}"/>
+                    <input type="hidden" name="room_id" id="room_id" value="{{room_details.id}}"/>
+                    
+                    <input type="text" name="message" id="message" class="message-input" placeholder="Type a message..." autocomplete="off">
+                    
+                    <div class="input-actions">
+                        <div class="emoji-picker-container">
+                            <button type="button" id="emoji-btn" class="input-btn">
+                                <i class="fas fa-smile"></i>
+                            </button>
+                            <emoji-picker id="emoji-picker"></emoji-picker>
+                        </div>
+                        
+                        <button type="button" id="attachment-btn" class="input-btn">
+                            <i class="fas fa-paperclip"></i>
+                        </button>
+                        <input type="file" name="attachment" id="attachment" style="display: none;" accept=".png,.jpg,.jpeg,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar,.mp4,.mp3,.wav,.gif,.svg">
+                        
+                        <button type="submit" class="input-btn send-btn">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+        
+        <!-- Gemini AI Assistant (new addition) -->
+        <div class="gemini-assistant">
+            <div class="assistant-header">
+                <h3><i class="fas fa-robot"></i> Gemini Assistant</h3>
+                <button class="toggle-assistant-btn" title="Toggle Assistant">
+                    <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+            
+            <div class="assistant-content">
+                <div class="assistant-messages" id="assistant-messages">
+                    <div class="assistant-message">
+                        <div class="assistant-icon">
+                            <i class="fas fa-robot"></i>
+                        </div>
+                        <div class="assistant-text">
+                            <p>Hello! I'm your Gemini AI assistant. I can help you with:</p>
+                            <ul>
+                                <li>Summarizing this chat room's conversations</li>
+                                <li>Answering questions about the app</li>
+                                <li>Finding information in chat history</li>
+                            </ul>
+                            <p>How can I assist you today?</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="assistant-actions">
+                    <button class="quick-action-btn" data-action="summarize">
+                        <i class="fas fa-scroll"></i> Summarize Chat
+                    </button>
+                    <button class="quick-action-btn" data-action="help">
+                        <i class="fas fa-question-circle"></i> Help
+                    </button>
+                </div>
+                
+                <div class="assistant-input-container">
+                    <form id="assistant-form" class="assistant-form">
+                        <input type="text" id="assistant-input" class="assistant-input" 
+                               placeholder="Ask Gemini something..." autocomplete="off">
+                        <button type="submit" class="assistant-send-btn">
+                            <i class="fas fa-paper-plane"></i>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Forward Modal -->
+    <div id="forward-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Forward Message</h3>
+                <button class="modal-close" id="close-forward-modal">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p>Select a room to forward your message:</p>
+                <div id="forward-rooms" class="room-list-content">
+                    <div class="loading">Loading rooms...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Your existing JavaScript with minor adjustments for the new UI
+        
+        let connectionFailed = 0;
+        let isTyping = false;
+        let typingTimeout;
+        let lastMessageCount = 0;
+        let messageIds = [];
+        
+        function updateMessages() {
+            $.ajax({
+                type: 'GET',
+                url: "/getMessages/{{room}}/",
+                success: function(response) {
+                    // Reset connection indicator
+                    connectionFailed = 0;
+                    $(".status-dot").removeClass("offline");
+                    
+                    if (!response.messages || response.messages.length === 0) {
+                        if ($("#display").find(".empty-chat").length === 0) {
+                            $("#display").html(`
+                                <div class="empty-chat">
+                                    <i class="far fa-comment-dots"></i>
+                                    <p>No messages yet</p>
+                                    <span>Be the first to start a conversation in this room!</span>
+                                </div>
+                            `);
+                        }
+                        return;
+                    }
+                    
+                    // Only update if we have new messages or first load
+                    if (response.messages.length !== lastMessageCount || lastMessageCount === 0) {
+                        // Save current scroll position
+                        const display = document.getElementById('display');
+                        const wasAtBottom = display.scrollHeight - display.scrollTop <= display.clientHeight + 50;
+                        
+                        lastMessageCount = response.messages.length;
+                        
+                        let messageHTML = '';
+                        let newMessageIds = [];
+                        let lastUser = null;
+                        let isNewUserGroup = true;
+                        
+                        // Process messages individually, not grouped by user
+                        for (var key in response.messages) {
+                            const message = response.messages[key];
+                            newMessageIds.push(message.id);
+                            const isNewMessage = !messageIds.includes(message.id);
+                            const isSelf = message.user === "{{username}}";
+                            
+                            // Determine if this is a new user group
+                            isNewUserGroup = (lastUser !== message.user);
+                            lastUser = message.user;
+                            
+                            // Start a new message-group div if it's a new user
+                            if (isNewUserGroup) {
+                                // Close previous group if it exists
+                                if (key > 0) {
+                                    messageHTML += '</div>';
+                                }
+                                
+                                // Create user-specific group with alignment class
+                                messageHTML += `<div class="message-group ${isSelf ? 'self-messages' : 'other-messages'}">`;
+                            }
+
+                            const messageClass = isSelf ? 'message message-sent' : 'message message-received';
+                            const animationClass = isNewMessage ? 'new-message' : '';
+
+                            // Attachment HTML generation (as in your original code)
+                            let attachmentHTML = '';
+                            if (message.attachment) {
+                                // Your existing attachment HTML code...
+                                const ext = message.attachment.split('.').pop().toLowerCase();
+                                const fileName = message.attachment.split('/').pop();
+                                
+                                if (['png','jpg','jpeg','gif','svg'].includes(ext)) {
+                                    attachmentHTML = `
+                                        <div class="attachment-container">
+                                            <img src="${message.attachment}" alt="attachment">
+                                            <div class="attachment-actions">
+                                                <a href="${message.attachment}" download="${fileName}" class="action-btn download-btn" title="Download image">
+                                                    <i class="fas fa-download"></i>
+                                                </a>
+                                            </div>
+                                        </div>`;
+                                } else if (['pdf'].includes(ext)) {
+                                    attachmentHTML = `
+                                        <div class="attachment-container">
+                                            <div class="file-attachment pdf-attachment">
+                                                <i class="fas fa-file-pdf"></i>
+                                                <span>${fileName}</span>
+                                                <div class="attachment-actions">
+                                                    <a href="${message.attachment}" target="_blank" title="View PDF" class="action-btn">
+                                                        <i class="fas fa-eye"></i>
+                                                    </a>
+                                                    <a href="${message.attachment}" download="${fileName}" class="action-btn download-btn" title="Download PDF">
+                                                        <i class="fas fa-download"></i>
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        </div>`;
+                                } else {
+                                    // Other file types HTML generation
+                                    let fileIcon = 'fas fa-file';
+                                    // Your existing file icon logic...
+                                    if (['doc', 'docx'].includes(ext)) fileIcon = 'fas fa-file-word';
+                                    else if (['xls', 'xlsx'].includes(ext)) fileIcon = 'fas fa-file-excel';
+                                    else if (['ppt', 'pptx'].includes(ext)) fileIcon = 'fas fa-file-powerpoint';
+                                    else if (['zip', 'rar'].includes(ext)) fileIcon = 'fas fa-file-archive';
+                                    else if (['mp4', 'avi', 'mov'].includes(ext)) fileIcon = 'fas fa-file-video';
+                                    else if (['mp3', 'wav'].includes(ext)) fileIcon = 'fas fa-file-audio';
+                                    
+                                    attachmentHTML = `
+                                        <div class="attachment-container">
+                                            <div class="file-attachment">
+                                                <i class="${fileIcon}"></i>
+                                                <span>${fileName}</span>
+                                                <div class="attachment-actions">
+                                                    <a href="${message.attachment}" download="${fileName}" class="action-btn download-btn" title="Download file">
+                                                        <i class="fas fa-download"></i>
+                                                    </a>
+                                                </div>
+                                            </div>
+                                        </div>`;
+                                }
+                            }
+
+                            // Add the message HTML
+                            messageHTML += `<div class="${messageClass} ${animationClass}" data-message-id="${message.id}">
+    <div class="message-header">
+        <span class="user-name">${isSelf ? 'You' : message.user}</span>
+    </div>
+    
+    <p class="message-content" id="content-${message.id}">${message.value || ''}</p>
+    ${attachmentHTML}
+    
+    <div class="message-actions">
+        <button class="action-btn copy-btn" title="Copy message">
+            <i class="fas fa-copy"></i>
+        </button>
+        <button class="action-btn forward-btn" title="Forward message">
+            <i class="fas fa-share"></i>
+        </button>
+        ${isSelf ? `
+            <button class="action-btn edit-btn" title="Edit message">
+                <i class="fas fa-edit"></i>
+            </button>
+            <button class="action-btn delete-btn" title="Delete message">
+                <i class="fas fa-trash"></i>
+            </button>
+        ` : ''}
+    </div>
+    
+    <div class="message-time">${message.date}</div>
+</div>`;
+                        }
+                        
+                        // Close the last message group
+                        if (Object.keys(response.messages).length > 0) {
+                            messageHTML += '</div>';
+                        }
+                        
+                        // Update the display
+                        $("#display").html(messageHTML);
+                        
+                        // Update stored message IDs
+                        messageIds = newMessageIds;
+                        
+                        // Restore scroll position if user was at bottom
+                        if (wasAtBottom) {
+                            display.scrollTop = display.scrollHeight;
+                        }
+                    }
+                },
+                error: function(response) {
+                    connectionFailed++;
+                    if (connectionFailed > 3) {
+                        $(".status-dot").addClass("offline");
+                        $(".room-status span").text("Disconnected");
+                    }
+                }
+            });
+        }
+        
+        $(document).ready(function() {
+            // Initial load and periodic updates
+            updateMessages();
+            setInterval(updateMessages, 3000);
+            
+            // Make sure emoji picker and download dropdown work correctly
+            $(document).ready(function() {
+    // Toggle emoji picker
+    $("#emoji-btn").on("click", function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        $("#emoji-picker").toggleClass("visible");
+    });
+    
+    // Close emoji picker when clicking elsewhere
+    $(document).on("click", function(e) {
+        if (!$(e.target).closest(".emoji-picker-container").length) {
+            $("#emoji-picker").removeClass("visible");
+        }
+    });
+    
+    // Open file dialog on attachment button click
+    $("#attachment-btn").on("click", function() {
+        $("#attachment").click();
+    });
+    
+    // Show selected file name
+    $("#attachment").on("change", function() {
+        if (this.files.length > 0) {
+            $("#message").attr("placeholder", `File: ${this.files[0].name}`);
+        }
+    });
+    
+    // Handle download dropdown
+    $(".download-btn").on("click", function(e) {
+        e.preventDefault();
+        $(".download-options").toggleClass("visible");
+    });
+    
+    // Close download dropdown when clicking elsewhere
+    $(document).on("click", function(e) {
+        if (!$(e.target).closest(".download-dropdown").length) {
+            $(".download-options").removeClass("visible");
+        }
+    });
+});
+
+            // Insert emoji
+            document.getElementById("emoji-picker").addEventListener("emoji-click", function(e) {
+                const messageInput = document.getElementById("message");
+                const cursor = messageInput.selectionStart;
+                const text = messageInput.value;
+                const insert = e.detail.unicode;
+                
+                messageInput.value = text.slice(0, cursor) + insert + text.slice(cursor);
+                messageInput.focus();
+                messageInput.selectionStart = cursor + insert.length;
+                messageInput.selectionEnd = cursor + insert.length;
+            });
+            
+            // Attachment button
+            $("#attachment-btn").on("click", function() {
+                $("#attachment").click();
+            });
+            
+            // Show selected file name
+            $("#attachment").on("change", function() {
+                if (this.files.length > 0) {
+                    $("#message").attr("placeholder", `File: ${this.files[0].name}`);
+                }
+            });
+            
+            // Form submission
+            $("#post-form").on("submit", function(e) {
+                e.preventDefault();
+                
+                const formData = new FormData(this);
+                const message = formData.get("message");
+                const room_id = formData.get("room_id");
+                const attachment = formData.get("attachment");
+                
+                console.log("Sending message:", message);
+                console.log("To room ID:", room_id);
+                
+                if (!message && (!attachment || !attachment.name)) {
+                    return;
+                }
+                
+                $.ajax({
+                    type: "POST",
+                    url: "/send",
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    success: function() {
+                        $("#message").val("").attr("placeholder", "Type a message...");
+                        $("#attachment").val("");
+                        updateMessages();
+                    },
+                    error: function() {
+                        alert("Failed to send message. Please try again.");
+                    }
+                });
+            });
+            
+            // Message actions: copy, forward, edit, delete
+            $(document).on("click", ".copy-btn", function(e) {
+                e.stopPropagation();
+                const messageId = $(this).closest(".message").data("message-id");
+                const text = $(`#content-${messageId}`).text();
+                
+                navigator.clipboard.writeText(text).then(() => {
+                    const toast = $('<div class="toast">Message copied!</div>');
+                    toast.css({
+                        position: "fixed",
+                        bottom: "20px",
+                        left: "50%",
+                        transform: "translateX(-50%)",
+                        background: "rgba(0,0,0,0.7)",
+                        color: "white",
+                        padding: "8px 16px",
+                        borderRadius: "4px",
+                        zIndex: 9999
+                    });
+                    $("body").append(toast);
+                    setTimeout(() => toast.fadeOut(300, function() { $(this).remove(); }), 2000);
+                });
+            });
+            
+            // Forward message
+            $(document).on("click", ".forward-btn", function(e) {
+                e.stopPropagation();
+                const messageId = $(this).closest(".message").data("message-id");
+                
+                // Show forward modal with proper flex display
+                $("#forward-modal").css({
+                    "display": "flex",
+                    "align-items": "center",
+                    "justify-content": "center"
+                });
+                
+                $("#forward-rooms").html('<div class="loading">Loading rooms...</div>');
+                
+                // Load available rooms
+                $.ajax({
+                    type: "GET",
+                    url: "/get_rooms/",
+                    success: function(data) {
+                        let roomList = "";
+                        if (data.rooms && data.rooms.length > 0) {
+                            data.rooms.forEach(function(room) {
+                                if (room.id != {{room_details.id}}) {
+                                    roomList += `
+                                        <div class="room-item">
+                                            <span class="room-name">
+                                                <i class="fas fa-comment-dots"></i> ${room.name}
+                                            </span>
+                                            <button class="forward-to-btn" data-room-id="${room.id}" data-room-name="${room.name}" data-message-id="${messageId}">
+                                                Forward
+                                            </button>
+                                        </div>
+                                    `;
+                                }
+                            });
+                            
+                            if (roomList === "") {
+                                roomList = '<div class="no-rooms">No other rooms available</div>';
+                            }
+                        } else {
+                            roomList = '<div class="no-rooms">No rooms available</div>';
+                        }
+                        
+                        $("#forward-rooms").html(roomList);
+                    },
+                    error: function() {
+                        $("#forward-rooms").html('<div class="error">Failed to load rooms</div>');
+                    }
+                });
+            });
+            
+            // Forward to specific room
+            $(document).on("click", ".forward-to-btn", function() {
+                const btn = $(this);
+                const roomId = btn.data("room-id");
+                const roomName = btn.data("room-name");
+                const messageId = btn.data("message-id");
+                
+                btn.prop("disabled", true).html('<i class="fas fa-spinner fa-spin"></i>');
+                
+                $.ajax({
+                    type: "POST",
+                    url: "/forward_message/",
+                    data: {
+                        message_id: messageId,
+                        target_room: roomId,
+                        csrfmiddlewaretoken: $('input[name=csrfmiddlewaretoken]').val()
+                    },
+                    success: function() {
+                        btn.html("✓ Sent").css({
+                            "background-color": "#39D98A"
+                        });
+                        
+                        setTimeout(function() {
+                            $("#forward-modal").hide();
+                        }, 1000);
+                    },
+                    error: function() {
+                        btn.prop("disabled", false).html("Failed").css({
+                            "background-color": "#FF3B5C"
+                        });
+                    }
+                });
+            });
+            
+            // Close forward modal
+            $("#close-forward-modal, #forward-modal").on("click", function(e) {
+                if (e.target === this) {
+                    $("#forward-modal").hide();
+                }
+            });
+            
+            // Edit message
+            $(document).on("click", ".edit-btn", function(e) {
+                e.stopPropagation();
+                const message = $(this).closest(".message");
+                const messageId = message.data("message-id");
+                const content = $(`#content-${messageId}`);
+                const text = content.text();
+                
+                content.html(`
+                    <input type="text" class="edit-input" value="${text}">
+                    <div class="edit-actions">
+                        <button class="cancel-edit-btn">Cancel</button>
+                        <button class="save-edit-btn" data-message-id="${messageId}">Save</button>
+                    </div>
+                `);
+                
+                message.addClass("editing");
+                content.find(".edit-input").focus();
+            });
+            
+            // Cancel editing
+            $(document).on("click", ".cancel-edit-btn", function() {
+                const message = $(this).closest(".message");
+                const messageId = message.data("message-id");
+                const originalText = $(`#content-${messageId} .edit-input`).val();
+                
+                message.removeClass("editing");
+                $(`#content-${messageId}`).html(originalText);
+            });
+            
+            // Save edited message
+            $(document).on("click", ".save-edit-btn", function() {
+                const message = $(this).closest(".message");
+                const messageId = $(this).data("message-id");
+                const newText = $(`#content-${messageId} .edit-input`).val();
+                
+                if (!newText.trim()) {
+                    return;
+                }
+                
+                $.ajax({
+                    type: "POST",
+                    url: "/edit_message/",
+                    data: {
+                        message_id: messageId,
+                        new_text: newText,
+                        csrfmiddlewaretoken: $('input[name=csrfmiddlewaretoken]').val()
+                    },
+                    success: function() {
+                        message.removeClass("editing");
+                        $(`#content-${messageId}`).html(newText);
+                    },
+                    error: function() {
+                        alert("Failed to update message");
+                    }
+                });
+            });
+            
+            // Delete message
+            $(document).on("click", ".delete-btn", function(e) {
+                e.stopPropagation();
+                const message = $(this).closest(".message");
+                const messageId = message.data("message-id");
+                
+                if (confirm("Delete this message?")) {
+                    $.ajax({
+                        type: "POST",
+                        url: "/delete_message/",
+                        data: {
+                            message_id: messageId,
+                            csrfmiddlewaretoken: $('input[name=csrfmiddlewaretoken]').val()
+                        },
+                        success: function() {
+                            message.fadeOut(300, function() {
+                                const group = $(this).closest(".message-group");
+                                $(this).remove();
+                                
+                                if (group.children(".message").length === 0) {
+                                    group.remove();
+                                }
+                            });
+                        },
+                        error: function() {
+                            alert("Failed to delete message");
+                        }
+                    });
+                }
+            });
+            
+            // Scroll to bottom initially
+            const display = document.getElementById("display");
+            display.scrollTop = display.scrollHeight;
+        });
+        
+        // Update room stats in the sidebar
+function updateRoomStats() {
+    // Update message count
+    $("#message-count").text(messageIds.length || "0");
+    
+    // Update file count
+    let fileCount = 0;
+    $(".attachment-container").each(function() {
+        fileCount++;
+    });
+    $("#file-count").text(fileCount || "0");
+    
+    // Update participant list (basic version - just shows current user)
+    // For a real implementation, you'd need to track users in the backend
+    const currentUser = "{{username}}";
+    
+    // If you want to get actual participants, you could:
+    // 1. Collect unique usernames from messages
+    // 2. Track active users on the backend
+    const uniqueUsers = new Set();
+    $(".message").each(function() {
+        const userName = $(this).find(".user-name").text();
+        if (userName && userName !== 'You') {
+            uniqueUsers.add(userName);
+        }
+    });
+    
+    // Update member list
+    let memberListHTML = `
+        <div class="member-item">
+            <div class="member-avatar">
+                ${currentUser.charAt(0).toUpperCase()}
+            </div>
+            <div class="member-details">
+                <div class="member-name">${currentUser} (You)</div>
+                <div class="member-status online">Active now</div>
+            </div>
+        </div>
+    `;
+    
+    uniqueUsers.forEach(user => {
+        memberListHTML += `
+            <div class="member-item">
+                <div class="member-avatar">
+                    ${user.charAt(0).toUpperCase()}
+                </div>
+                <div class="member-details">
+                    <div class="member-name">${user}</div>
+                    <div class="member-status">Active recently</div>
+                </div>
+            </div>
+        `;
+    });
+    
+    $("#member-list").html(memberListHTML);
+}
+
+// Toggle sidebar on mobile
+$(".toggle-sidebar-btn").on("click", function() {
+    $(".room-sidebar").slideToggle(300);
+});
+
+// Call updateRoomStats whenever messages are loaded
+const originalUpdateMessages = updateMessages;
+updateMessages = function() {
+    originalUpdateMessages();
+    updateRoomStats();
+};
+
+// Gemini AI Assistant Functionality
+$(document).ready(function() {
+    // Toggle assistant visibility on mobile
+    $(".toggle-gemini-btn").on("click", function() {
+        $(".gemini-assistant").toggleClass("show");
+    });
+    
+    // Toggle assistant panel with the button in assistant header
+    $(".toggle-assistant-btn").on("click", function() {
+        $(".gemini-assistant").toggleClass("collapsed");
+        $(this).find("i").toggleClass("fa-chevron-right fa-chevron-left");
+    });
+    
+    // Quick action buttons
+    $(".quick-action-btn").on("click", function() {
+        const action = $(this).data("action");
+        
+        if (action === "summarize") {
+            // Show typing indicator
+            showAssistantTyping();
+            
+            // Get room summary from the Gemini API
+            $.ajax({
+                type: "GET",
+                url: `/gemini/summary/{{room}}/`,
+                success: function(response) {
+                    // Hide typing indicator
+                    hideAssistantTyping();
+                    
+                    // Add the summary to the chat
+                    addAssistantMessage(response.summary);
+                    
+                    // Scroll to bottom
+                    scrollAssistantToBottom();
+                },
+                error: function(error) {
+                    hideAssistantTyping();
+                    addAssistantMessage("Sorry, I couldn't generate a summary at this time. Please try again later.");
+                    console.error("Error getting summary:", error);
+                }
+            });
+        } else if (action === "help") {
+            // Show help message
+            const helpMessage = `
+                <p>Here are some things you can ask me:</p>
+                <ul>
+                    <li>"Summarize this conversation"</li>
+                    <li>"What was discussed about [topic]?"</li>
+                    <li>"Who mentioned [keyword]?"</li>
+                    <li>"Tell me about this chat app"</li>
+                    <li>"How do I share files?"</li>
+                </ul>
+                <p>I'm here to help you navigate and understand your conversations!</p>
+            `;
+            addAssistantMessage(helpMessage);
+            scrollAssistantToBottom();
+        }
+    });
+    
+    // Handle assistant form submission
+    $("#assistant-form").on("submit", function(e) {
+        e.preventDefault();
+        
+        const query = $("#assistant-input").val().trim();
+        if (!query) return;
+        
+        // Add user message
+        addUserMessage(query);
+        
+        // Clear input
+        $("#assistant-input").val("");
+        
+        // Show typing indicator
+        showAssistantTyping();
+        
+        // Send query to Gemini API
+        $.ajax({
+            type: "POST",
+            url: "/gemini/ask/",
+            contentType: "application/json",
+            data: JSON.stringify({
+                query: query,
+                room_name: "{{room}}"
+            }),
+            success: function(response) {
+                // Hide typing indicator
+                hideAssistantTyping();
+                
+                // Add the response to the chat
+                addAssistantMessage(response.response);
+                
+                // Scroll to bottom
+                scrollAssistantToBottom();
+            },
+            error: function(error) {
+                hideAssistantTyping();
+                addAssistantMessage("Sorry, I couldn't process your request at this time. Please try again later.");
+                console.error("Error asking Gemini:", error);
+            }
+        });
+    });
+    
+    // Helper functions
+    function addAssistantMessage(message) {
+        const assistantHTML = `
+            <div class="assistant-message">
+                <div class="assistant-icon">
+                    <i class="fas fa-robot"></i>
+                </div>
+                <div class="assistant-text">
+                    ${message}
+                </div>
+            </div>
+        `;
+        
+        $("#assistant-messages").append(assistantHTML);
+    }
+    
+    function addUserMessage(message) {
+        const userHTML = `
+            <div class="assistant-message">
+                <div class="user-icon">
+                    <i class="fas fa-user"></i>
+                </div>
+                <div class="user-text">
+                    <p>${message}</p>
+                </div>
+            </div>
+        `;
+        
+        $("#assistant-messages").append(userHTML);
+        scrollAssistantToBottom();
+    }
+    
+    function showAssistantTyping() {
+        const typingHTML = `
+            <div class="assistant-message typing-message">
+                <div class="assistant-icon">
+                    <i class="fas fa-robot"></i>
+                </div>
+                <div class="assistant-typing">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
+        `;
+        
+        $("#assistant-messages").append(typingHTML);
+        scrollAssistantToBottom();
+    }
+    
+    function hideAssistantTyping() {
+        $(".typing-message").remove();
+    }
+    
+    function scrollAssistantToBottom() {
+        const messagesContainer = document.getElementById("assistant-messages");
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+    }
+});
+    </script>
+</body>
+</html>
